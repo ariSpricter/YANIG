@@ -3,10 +3,10 @@ import numpy as np
 import tensorflow as tf
 import librosa
 import seaborn as sns
-from sklearn.metrics import confusion_matrix
 import tensorflow_hub as hub
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
+import argparse
+from sklearn.metrics import confusion_matrix
 from tensorflow.keras.preprocessing import image
 from matplotlib.patches import Rectangle
 
@@ -15,7 +15,7 @@ classes = ["car_horn", "cat", "dog", "glass_breaking", "siren"]
 
 # Load the trained model (ensure it's the correct model path)
 model = tf.keras.models.load_model('classifier_model.keras')
-class_images_dir = "./class_images"  # Directory containing class images
+class_images_dir = "./class_images"  # Defining directory containing class images
 
 # Load YAMNet model
 yamnet_model_handle = "https://tfhub.dev/google/yamnet/1"
@@ -24,10 +24,10 @@ yamnet_model = hub.load(yamnet_model_handle)
 # Function to load and preprocess audio
 def load_and_preprocess_audio(file_path, target_sr=16000):
     file_contents = tf.io.read_file(file_path)
-    wav, sample_rate = tf.audio.decode_wav(file_contents, desired_channels=1)
-    wav = tf.squeeze(wav, axis=-1)  # Remove channel dimension
+    wav, sample_rate = tf.audio.decode_wav(file_contents, desired_channels=1) # Converting to wav form and setting to mono channel
+    wav = tf.squeeze(wav, axis=-1)
     sample_rate = tf.cast(sample_rate, dtype=tf.int32)
-    wav = librosa.resample(wav.numpy(), orig_sr=sample_rate.numpy(), target_sr=target_sr)
+    wav = librosa.resample(wav.numpy(), orig_sr=sample_rate.numpy(), target_sr=target_sr) # Converting to form that is accepted by YAMNet
     return tf.convert_to_tensor(wav, dtype=tf.float32)
 
 # Function to extract YAMNet embeddings from the audio
@@ -35,7 +35,7 @@ def extract_yamnet_embeddings(audio):
     audio = tf.squeeze(audio)
     _, embeddings, _ = yamnet_model(audio)  # Only the embeddings are used
     avg_embedding = tf.reduce_mean(embeddings, axis=0)  # Average across time
-    return avg_embedding.numpy()  # Convert tensor to numpy array for model input
+    return avg_embedding.numpy()  # Converting to numpy array for model input
 
 # Function to classify an individual audio file and return prediction and confidence values
 def classify_file(file_path):
@@ -63,18 +63,21 @@ def classify_and_plot_file(file_path):
 
     # Load the image for the predicted class
     class_image_path = os.path.join(class_images_dir, f"{predicted_class}.jpg")
-    img = image.load_img(class_image_path, target_size=(300, 500))  # Resize image to fit in the plot
+    img = image.load_img(class_image_path, target_size=(300, 300))  # Resize image to fit in the plot
     img_array = image.img_to_array(img)  # Convert image to array
     
     # Plot the image and the bar chart of confidence values
-    fig, ax = plt.subplots(1, 2, figsize=(10, 5))  # Create a figure with 2 subplots
+    _, ax = plt.subplots(1, 2, figsize=(10, 5))  # Create a figure with 2 subplots
     
     # Add a border around the image
     ax[0].imshow(img_array.astype('uint8'))
     ax[0].axis('off')  # Turn off axis
+
+    # Keep the aspect ratio square
+    ax[0].set_aspect('equal', adjustable='box')
     
     # Add border around image
-    border = Rectangle((0, 0), 1, 1, linewidth=5, edgecolor='black', facecolor='none')
+    border = Rectangle((0, 0), 1, 1, linewidth=10, edgecolor='black', facecolor='none')
     ax[0].add_patch(border)
     
     # Add text below the image
@@ -88,7 +91,7 @@ def classify_and_plot_file(file_path):
     ax[1].set_ylim([0, 1])  # Set y-axis from 0 to 1
     
     # Show the plot
-    plt.tight_layout()
+    plt.tight_layout(pad=4.0)
     plt.show()
     
     return predicted_class, confidence_values
@@ -112,6 +115,7 @@ def classify_directory(data_dir):
                     true_labels.append(class_name)
                     predicted_labels.append(predicted_class)
                     
+    # Return the true labels and predicted labels
     return true_labels, predicted_labels
 
 # Function to classify and plot the entire directory
@@ -131,18 +135,22 @@ def classify_and_plot_directory(directory_path):
     plt.ylabel("True")
     plt.title("Confusion Matrix")
     plt.show()
-
-# Testing Individual Classification
-
-"""Uncomment this code to test Individual Classification and replace path with testing file path"""
-#testing_file_path = "./testing_data/glass_breaking/2-250710-A-39.wav"
-#predicted_class, confidence_values = classify_and_plot_file(testing_file_path)
-#print(f"Predicted Class: {predicted_class}")
-#print(f"Confidence Values: {confidence_values}")
-
-# Testing Directory Classification
-
-"""Make sure to comment this code when testing Individual Classification"""
-directory_path = "./testing_data"
-classify_and_plot_directory(directory_path=directory_path)
  
+testing_data_dir = "./testing_data"
+
+# Main function to parse command-line arguments
+def main():
+    parser = argparse.ArgumentParser(description="Audio Classification")
+    parser.add_argument('--file', type=str, help="Path to the audio file for individual classification")
+    args = parser.parse_args()
+    
+    if args.file:
+        print(f"Classifying individual file: {args.file}")
+        predicted_class, confidence_values = classify_and_plot_file(args.file)
+        print(f"Predicted Class: {predicted_class}")
+        print(f"Confidence Values: {confidence_values}")
+    else:
+        classify_and_plot_directory(testing_data_dir)
+
+if __name__ == "__main__":
+    main()
