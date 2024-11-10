@@ -3,12 +3,14 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_hub as hub
 import librosa
+import argparse
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.optimizers import Adam
-import matplotlib.pyplot as plt
+
 
 # Load YAMNet model from TensorFlow Hub
 yamnet_model_handle = "https://tfhub.dev/google/yamnet/1"
@@ -43,13 +45,13 @@ def load_data(data_dir, classes):
                 file_path = os.path.join(class_dir, filename)
                 audio = load_and_preprocess_audio(file_path)
                 embedding = extract_yamnet_embeddings(audio)
-                data.append(embedding.numpy())  # Convert Tensor to NumPy array
+                data.append(embedding.numpy())
                 labels.append(i)
     return np.array(data), np.array(labels)
 
 # Set your data directory and classes
-data_dir = "./training_data"  # Replace with actual data directory
-classes = ["car_horn", "cat", "dog", "glass_breaking", "siren"]  # Replace with your class names
+data_dir = "./training_data"  # Replace with actual training data directory
+classes = ["car_horn", "cat", "dog", "glass_breaking", "siren"]  # Replace with class names
 
 # Load the data and labels, and one-hot encode the labels
 data, labels = load_data(data_dir, classes)
@@ -58,12 +60,12 @@ labels = to_categorical(labels, num_classes=len(classes))
 # Split the data into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(data, labels, test_size=0.2, random_state=42)
 
-# Best hyperparameters from your previous tuning
+# Best hyperparameters from hyperparameter tuning
 best_num_layers = 1   # 1 hidden layer
 best_units_0 = 256    # 256 units in the hidden layer
 best_learning_rate = 0.0006737447552989427   # Learning rate
 best_batch_size = 32  # Best batch size found
-best_epochs = 20      # Best number of epochs (from your tuning)
+best_epochs = 25      # Best number of epochs
 
 # Define the new model that uses YAMNet embeddings as input, based on the best hyperparameters
 model = Sequential([
@@ -94,9 +96,20 @@ test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose=2)
 print(f"Loss: {test_loss * 100:.2f}%")
 print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
 
-saved_model_path = 'classifier_model.keras'
+# Save model if user requested
+def save_model():
+    saved_model_path = 'classifier_model.keras'
+    model.save(saved_model_path, include_optimizer=False)
+    print(f"Model saved to {saved_model_path}")
 
-"""Comment this line to stop saving new models"""
-model.save(saved_model_path, include_optimizer=False)
-
-print("Model saved for deployment.")
+# Command line argument handling
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Train a model and optionally save it.")
+    parser.add_argument('--save', action='store_true', help="Flag to save the model after training.")
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Save model based on the argument
+    if args.save:
+        save_model()
