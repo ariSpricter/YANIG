@@ -61,6 +61,8 @@ def classify_file(file_path):
 def classify_and_plot_file(file_path):
     predicted_class, confidence_values, predicted_class_index = classify_file(file_path=file_path)
 
+    plot_spectogram(file_path=file_path)
+
     # Load the image for the predicted class
     class_image_path = os.path.join(class_images_dir, f"{predicted_class}.jpg")
     img = image.load_img(class_image_path, target_size=(300, 300))  # Resize image to fit in the plot
@@ -137,6 +139,30 @@ def classify_and_plot_directory(directory_path):
     plt.show()
  
 testing_data_dir = "./testing_data"
+
+def plot_spectogram(file_path):
+    audio_data, sample_rate = librosa.load(file_path, sr=None)
+
+    # Generate spectogram
+    mel_spectrogram = librosa.feature.melspectrogram(y=audio_data, sr=sample_rate)
+    mel_spectrogram_db = librosa.power_to_db(mel_spectrogram, ref=np.max)
+    
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    
+    # Plotting waveform
+    ax1.plot(np.linspace(0, len(audio_data) / sample_rate, num=len(audio_data)), audio_data)
+    ax1.set_title(f"Waveform of {file_path}")
+    ax1.set_xlabel("Time (s)")
+    ax1.set_ylabel("Amplitude")
+    
+    # Plotting spectogram
+    img = librosa.display.specshow(mel_spectrogram_db, sr=sample_rate, x_axis='time', y_axis='mel', ax=ax2)
+    ax2.set_title(f"Mel Spectrogram of {file_path}")
+    fig.colorbar(img, ax=ax2, format="%+2.0f dB")
+    
+    plt.tight_layout()
+    plt.show()
+
 
 # Main function to parse command-line arguments
 def main():
